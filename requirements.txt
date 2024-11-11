@@ -1,0 +1,5 @@
+python-telegram-bot==20.5
+python-dotenv==1.0.0
+google-generativeai
+chromadb
+sentence-transformers
