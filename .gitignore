@@ -1,0 +1,230 @@
+draft*
+__pycache__/
+__pycache__
+chroma.log
+
+# Virtual environments
+env/
+venv/
+ENV/
+VENV/
+myenv/
+.venv/
+.Python
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.cache
+pytest_cache/
+
+# Jupyter Notebook files
+.ipynb_checkpoints
+
+# pyenv
+.python-version
+
+# dotenv environment variables file
+.env
+.env.*
+
+# Mypy
+.mypy_cache/
+.dmypy.json
+dmypy.json
+
+# Pyre
+.pyre/
+
+# Pyright
+.pyright/
+
+# VSCode settings
+.vscode/
+
+# IDEs
+.idea/
+*.iml
+*.sublime-project
+*.sublime-workspace
+
+# macOS files
+.DS_Store
+.AppleDouble
+.LSOverride
+
+# Windows files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+
+# Node.js directories
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Logs
+*.log
+
+# Database files
+*.sqlite3
+*.db
+
+# Package managers
+package-lock.json
+yarn.lock
+.pnpm-debug.log
+
+# OS-generated files
+*.swp
+*.swo
+*.lock
+
+# Image editing artifacts
+Thumbs.db
+
+# Backup files
+*~
+*.bak
+*.tmp
+*.old
+*.orig
+
+# Temporary files created by editors
+*.swp
+*.swo
+*.tmp
+
+# Compiled files
+*.o
+*.obj
+*.dll
+*.class
+*.jar
+*.exe
+*.out
+
+# Python profiler files
+.prof
+.cprof
+
+# Environments or other temporary files
+.venv/
+
+# Flask/Django or web app config files
+instance/
+config.py
+
+# Jupyter Notebook temporary files
+.ipynb_checkpoints/
+
+# TensorFlow or Keras model files
+*.h5
+*.pb
+*.tflite
+
+# Miscellaneous files
+*.pdf
+*.docx
+*.pptx
+*.key
+
+# Data files
+*.csv
+*.tsv
+*.json
+*.xml
+
+# Binary files
+*.bin
+
+# Cache files
+.cache/
+.parquet
+
+# Archives
+*.zip
+*.tar.gz
+*.rar
+*.7z
+
+# Miscellaneous
+*.idea/
+*.vscode/
+*.code-workspace
+
+# AWS credentials
+.aws/
+
+# Machine Learning / Model Training
+notebooks/
+results/
+runs/
+logs/
+model_checkpoints/
+
+# User-specific config files
+*.mo
+*.pot
+
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# C extensions
+*.so
+
+# Distribution / packaging
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+share/python-wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+
+*.manifest
+*.spec
+
+# Installer logs
+pip-log.txt
+pip-delete-this-directory.txt
+
+# Unit test / coverage reports
+htmlcov/
+.tox/
+.nox/
+.coverage
+.coverage.*
+.cache
+nosetests.xml
+coverage.xml
+*.cover
+*.py,cover
+.hypothesis/
+.pytest_cache/
+cover/
