@@ -1,11 +1,28 @@
+from typing import List, Optional
+import json
+from pydantic import BaseModel
+import pydantic
 from modules.base_module import TrackModule
 from utils import generate_content
-import json
+
+# Define Pydantic models for report structure
+class QuestionScore(BaseModel):
+    id: int
+    question: str
+    score: str   # Should be '+' or '-'
+    error: Optional[str] = None  # User mistake if score is '-'
+    proper_answer: Optional[str] = None  # Proper answer if score is '-'
+
+class Report(BaseModel):
+    questions_and_scores: List[QuestionScore]
+    total_score: float  # Number of '+' divided by the number of questions
+    recommendations_to_repeat: Optional[List[str]]
 
 class iOSTrackModule:
-    def __init__(self, user_preferences, rag_manager):
+    def __init__(self, user_preferences, rag_manager, type_name="IOS_RU"):
         self.user_preferences = user_preferences
         self.rag_manager = rag_manager
+        self.type_name = type_name
     
     def get_questions_by_theme(self):
         # Retrieve questions related to the given theme using embeddings or any other logic
@@ -14,7 +31,7 @@ class iOSTrackModule:
     def get_questions_by_level(self):
         # Fetch questions for a particular level
         print(self.user_preferences['level'], self.rag_manager.sglite, self.user_preferences['number_of_questions'])
-        return self.rag_manager.get_questions_by_level(self.user_preferences['level'], self.user_preferences['number_of_questions'])
+        return self.rag_manager.get_questions_by_level(self.type_name, self.user_preferences['level'], self.user_preferences['number_of_questions'])
     
     def fetch_questions(self):
         # Fetch iOS-specific questions based on level and theme
@@ -25,51 +42,58 @@ class iOSTrackModule:
         return questions
 
     async def generate_report(self, answers, questions):
+        
         # Compare answers, calculate score, and generate report
-        prompt = f"""Write report based on user's answers: {answers}. 
-        The questions and proper answers are: {questions}.
+        schema = json.dumps(Report.model_json_schema(), indent=2)
+        prompt = (
+            f"""Based on the user's answers: {answers}, generate a report using the following questions and proper answers: {questions}.
+            
+            Format the report as JSON that adheres to the following schema:
+            {schema}
+            
+            Make sure the report includes real data, with '+' or '-' as scores, and includes proper answers and user mistakes if applicable. Return only valid JSON data."""
+        )
+    
+        # Await the result of the async function
+        content = await generate_content(prompt)
+        print(f"[DEBUG] Generated content: {content}")  # Debug: Print raw content from the prompt
+        content = content.strip().lstrip("```json").rstrip("```")
 
-        Return report in json format with the following keys:
-            "question_and_scores": list of dictionaries with keys "question" and "score"(might be + or -) and "error"(if score is negative you need to explain where is error and say proper answer, otherwise None)
-            "total_score": number of '+' divided by number of questions.
-            "recommendations to repeat": (list of themes in which user made a mistake)
+        try:
+            content_json = json.loads(content)
+            print(f"[DEBUG] Content JSON before validation: {json.dumps(content_json, indent=2)}")
+            report_json = Report.model_validate(content_json)
+        except json.JSONDecodeError as e:
+            print(f"[ERROR] JSON parsing failed: {e}")
+            return "Error: Unable to parse the report content."
+        except pydantic.ValidationError as e:
+            print(f"[ERROR] Validation failed: {e}")
+            print(f"[DEBUG] Content JSON structure: {json.dumps(content_json, indent=2)}")
+            return "Error: The generated content does not match the expected report structure."
 
-        """
-        prompt = f"""Write report based on user's answers: {answers}. 
-        The questions and proper answers are: {questions}.
-        Report must be in the following format:
+        print(f"[DEBUG] Parsed report JSON: {report_json}")  # Debug: Print parsed JSON report
 
-        1. Question: 
-        Score + 
-        2. Question: 
-        Score - 
-        User's mistake 
-        Proper Answer
-        ...
+        # Format the report as a user-friendly string
+        formatted_report = "Report:\n\n"
+        for idx, item in enumerate(report_json.questions_and_scores, start=1):
+            formatted_report += f"{idx}. Question: {item.question}\n"
+            formatted_report += f"   Score: {item.score}\n"
+            if item.score == '-':
+                formatted_report += f"   User's mistake: {item.error}\n"
+                formatted_report += f"   Proper Answer: {item.proper_answer}\n"
+            else:
+                # Call change_status when score is +
+                print(f"[DEBUG] Changing status for question {idx} to 'Completed'")  # Debug: Status change
+                await self.change_status(item.id, "Completed")
+            formatted_report += "\n"
 
-        Total score: number of '+' divided by number of questions.
-        Recommendations to repeat: (list of themes in which user made a mistake)
-        """
-        content = generate_content(prompt)
-        # # Await the result of the async function
-        # content = await generate_content(prompt)
-        # print(f"Generated content: {content}") 
-        # content = content.lstrip('"""json').rstrip('"""')
-        # # Parse JSON response
-        # report_json = json.loads(content)
+        formatted_report += f"Total score: {report_json.total_score:.2f}\n\n"
+        formatted_report += "Recommendations to repeat:\n"
+        formatted_report += "\n".join(report_json.recommendations_to_repeat or ["None"])  # Add default 'None' if empty
 
-        # # Format the report as a user-friendly string
-        # formatted_report = "Report:\n\n"
-        # for idx, item in enumerate(report_json["question_and_scores"], start=1):
-        #     formatted_report += f"{idx}. Question: {item['question']}\n"
-        #     formatted_report += f"   Score: {item['score']}\n"
-        #     if item['score'] == '-':
-        #         formatted_report += f"   User's mistake: {item['error']}\n"
-        #         formatted_report += f"   Proper Answer: {questions[idx - 1]['answer']}\n"
-        #     formatted_report += "\n"
+        print(f"[DEBUG] Final formatted report:\n{formatted_report}")  # Debug: Print final report
+        return formatted_report
 
-        # formatted_report += f"Total score: {report_json['total_score']:.2f}\n\n"
-        # formatted_report += "Recommendations to repeat:\n"
-        # formatted_report += "\n".join(report_json["recommendations to repeat"])
-
-        # return formatted_report
+    async def change_status(self, id, status):
+        print(f"[DEBUG] change_status called with id: {id}, status: {status}")  # Debug: Print change_status call details
+        return self.rag_manager.change_status(id, status)
