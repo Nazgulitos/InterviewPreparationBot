@@ -15,7 +15,7 @@ TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 
 # Database connection
 client = chromadb.HttpClient(host='localhost', port=8000)
-chromadb_connection = client.get_or_create_collection(name="documents_store_3")
+chromadb_connection = client.get_or_create_collection(name="chromadb_demo")
 
 # SQLite database connection and table creation
 def create_sqlite_db(path):
@@ -23,6 +23,7 @@ def create_sqlite_db(path):
     cursor = connection.cursor()
     cursor.execute('''CREATE TABLE IF NOT EXISTS questions (
                         id TEXT PRIMARY KEY,
+                        theme TEXT,
                         question TEXT,
                         answer TEXT,
                         level TEXT,
@@ -31,13 +32,13 @@ def create_sqlite_db(path):
     return connection
 
 # Create or open SQLite database
-db_path = 'questions.db'
+db_path = 'sglite_demo.db'
 sqlite_connection = create_sqlite_db(db_path)
 
 rag_manager = RAGManager(chromadb_connection, sqlite_connection)
 
 # Define states for conversation
-CHOOSING_TRACK, CHOOSING_LEVEL, CHOOSING_QUESTIONS, THEME_OPTION, GENERATE_TEST, GENERATE_REPORT = range(6)
+CHOOSING_TRACK, CHOOSING_LEVEL, CHOOSING_QUESTIONS, THEME_OPTION, GENERATE_TEST, GENERATE_REPORT, RETAKE_TEST = range(7)
 
 # Global variables to store user preferences
 user_preferences = {}
@@ -47,9 +48,9 @@ async def start(update: Update, context: CallbackContext):
     print("Starting conversation...")
     await update.message.reply_text(
         "Welcome to the Interview Bot! Please choose a track:\n\n"
-        "1. ML\n"
-        "2. iOS", 
-        reply_markup=ReplyKeyboardMarkup([['ML', 'iOS']], one_time_keyboard=True)
+        "1. ML_EN\n"
+        "2. IOS_RU", 
+        reply_markup=ReplyKeyboardMarkup([['ML_EN', 'IOS_RU']], one_time_keyboard=True)
     )
     return CHOOSING_TRACK
 
@@ -58,8 +59,8 @@ async def choose_track(update: Update, context: CallbackContext):
     user_preferences['track'] = update.message.text
     print(f"Track selected: {user_preferences['track']}")
     
-    if user_preferences['track'] == 'ML':
-        print("Sending ML track level options...")
+    if user_preferences['track'] == 'ML_EN':
+        print("Sending ML_EN track level options...")
         await update.message.reply_text(
             "Please choose your level:\n\n"
             "1. Junior\n"
@@ -69,7 +70,7 @@ async def choose_track(update: Update, context: CallbackContext):
             reply_markup=ReplyKeyboardMarkup([['Junior', 'Middle/Senior', 'Deep_Learning', 'NLP']], one_time_keyboard=True)
         )
     else:  # For iOS
-        print("Sending iOS track level options...")
+        print("Sending iOS_RU track level options...")
         await update.message.reply_text(
             "Please choose your level:\n\n"
             "1. Junior\n"
@@ -129,7 +130,7 @@ async def theme_option(update: Update, context: CallbackContext):
 async def generate_test(update: Update, context: CallbackContext):
     print("Generating test...")
 
-    if user_preferences['track'] == 'ML':
+    if user_preferences['track'] == 'ML_EN':
         print("Initializing ML module...")
         module = MLTrackModule(user_preferences, rag_manager)
     else:
@@ -147,8 +148,9 @@ async def generate_test(update: Update, context: CallbackContext):
     # Create a single string to hold the test content
     test_content = "Here's your test:\n\n"
     idx = 1
+    print(questions)
     for question in questions[:user_preferences['number_of_questions']]:
-        test_content += f"{idx}. Question: {question['question']}\n\n"
+        test_content += f"{idx}. {question['question']}\n\n"
         idx += 1
     # Send the complete test in one message
     await update.message.reply_text(test_content)
@@ -160,14 +162,57 @@ async def generate_test(update: Update, context: CallbackContext):
 # Final Report option handler
 async def generate_report(update: Update, context: CallbackContext):
     user_answers = update.message.text.lower()
-    if user_preferences['track'] == 'ML':
+    if user_preferences['track'] == 'ML_EN':
         module = MLTrackModule(user_preferences, rag_manager)
     else:
         module = iOSTrackModule(user_preferences, rag_manager)
     report_prompt = await module.generate_report(user_answers, user_preferences['questions'])
     await update.message.reply_text(report_prompt)
-    return ConversationHandler.END
+    
+    # Ask if the user wants to retake the test with buttons
+    reply_keyboard = [['Yes', 'No']]
+    await update.message.reply_text(
+        "Would you like to take the new test? (yes/no)",
+        reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True, resize_keyboard=True)
+    )
+    return RETAKE_TEST
 
+# Retake test handler
+async def retake_test(update: Update, context: CallbackContext):
+    user_response = update.message.text.lower()
+
+    if user_response == 'yes':
+        # Reset user preferences to start over
+        user_preferences.clear()
+        await update.message.reply_text(
+            "Let's start a new test! Please choose a track:\n\n"
+            "1. ML_EN\n"
+            "2. IOS_RU",
+            reply_markup=ReplyKeyboardMarkup([['ML_EN', 'IOS_RU']], one_time_keyboard=True, resize_keyboard=True)
+        )
+        return CHOOSING_TRACK
+    elif user_response == 'no':
+        # Provide a "Start Again" button along with a goodbye message
+        reply_keyboard = [['Start Again']]
+        await update.message.reply_text(
+            "Thank you for using the Interview Bot! If you'd like to start again, press the button below.",
+            reply_markup=ReplyKeyboardMarkup(reply_keyboard, one_time_keyboard=True, resize_keyboard=True)
+        )
+        return RETAKE_TEST
+    elif user_response == 'start again':
+        # Reset user preferences and go back to track selection
+        user_preferences.clear()
+        await update.message.reply_text(
+            "Let's start a new test! Please choose a track:\n\n"
+            "1. ML_EN\n"
+            "2. IOS_RU",
+            reply_markup=ReplyKeyboardMarkup([['ML_EN', 'IOS_RU']], one_time_keyboard=True, resize_keyboard=True)
+        )
+        return CHOOSING_TRACK
+    else:
+        await update.message.reply_text("Thank you for using the Interview Bot! Goodbye.")
+        return ConversationHandler.END
+    
 # Conversation handler
 conv_handler = ConversationHandler(
     entry_points=[CommandHandler('start', start)],
@@ -178,6 +223,7 @@ conv_handler = ConversationHandler(
         THEME_OPTION: [MessageHandler(filters.TEXT & ~filters.COMMAND, theme_option)],
         GENERATE_TEST: [MessageHandler(filters.TEXT & ~filters.COMMAND, generate_test)],
         GENERATE_REPORT: [MessageHandler(filters.TEXT & ~filters.COMMAND, generate_report)],
+        RETAKE_TEST: [MessageHandler(filters.TEXT & ~filters.COMMAND, retake_test)],
     },
     fallbacks=[],
 )
