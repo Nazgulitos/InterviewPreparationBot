@@ -2,6 +2,10 @@ import sqlite3
 import chromadb
 from sentence_transformers import SentenceTransformer
 import csv
+import fitz 
+import numpy as np
+from sklearn.cluster import DBSCAN
+from sklearn.metrics.pairwise import cosine_similarity
 
 embedder = SentenceTransformer('all-MiniLM-L6-v2')
 IDX = 0
@@ -14,7 +18,7 @@ def generate_embeddings(texts):
     return embeddings
 
 # Function to add questions to ChromaDB with full metadata
-def add_questions_from_csv_to_db(csv_file_path, collection, db_connection, theme):
+def add_questions_from_csv_to_db(csv_file_path, db_connection, theme):
     global IDX
     with open(csv_file_path, newline='', encoding='utf-8') as csvfile:
         reader = csv.DictReader(csvfile)
@@ -24,21 +28,21 @@ def add_questions_from_csv_to_db(csv_file_path, collection, db_connection, theme
             level = row['level']
             status = row['status']
             unique_id = str(IDX) 
-            embedding = generate_embeddings(question_text)[0]
+            # embedding = generate_embeddings(question_text)[0]
             IDX += 1
             
             # Store question and answer with full metadata in ChromaDB
-            collection.add(
-                ids=[unique_id],
-                metadatas=[{
-                    'theme': theme,
-                    'question_text': question_text,
-                    'answer_text': answer_text,
-                    'level': level,
-                    'status': status
-                }],
-                embeddings=[embedding]
-            )
+            # collection.add(
+            #     ids=[unique_id],
+            #     metadatas=[{
+            #         'theme': theme,
+            #         'question_text': question_text,
+            #         'answer_text': answer_text,
+            #         'level': level,
+            #         'status': status
+            #     }],
+            #     embeddings=[embedding]
+            # )
             # Add the metadata to SQLite database
             cursor = db_connection.cursor()
             cursor.execute("INSERT INTO questions (id, theme, question, answer, level, status) VALUES (?, ?, ?, ?, ?, ?)",
@@ -122,6 +126,7 @@ def get_questions_by_level_from_sqlite(theme, level, db_connection, n_results):
         })
 
     return relevant_questions
+
 def change_status(id, status, db_connection):
     cursor = db_connection.cursor()
 
@@ -138,6 +143,131 @@ def change_status(id, status, db_connection):
         print(f"No rows were updated. Check if ID: {id} exists in the database.")
 
     return True
+
+# Function to extract text from a PDF and chunk it into semantically meaningful pieces
+def extract_text_from_pdf(pdf_file_path):
+    doc = fitz.open(pdf_file_path)
+    all_text = []
+    
+    # Iterate over the pages in the PDF and extract text
+    for page_num in range(doc.page_count):
+        page = doc.load_page(page_num)
+        text = page.get_text("text")
+        all_text.append(text)
+    
+    return "\n".join(all_text)
+
+import numpy as np
+from sklearn.cluster import DBSCAN
+from sklearn.metrics.pairwise import cosine_similarity
+
+def semantic_chunking(text, min_samples=2, eps=0.5, max_sentences_per_chunk=3):
+    # Split the text into sentences
+    sentences = text.split('. ')  # Simple sentence splitting, you can use a more advanced tokenizer like spaCy
+    
+    # Generate embeddings for each sentence
+    sentence_embeddings = generate_embeddings(sentences)
+    
+    # Compute pairwise cosine similarities
+    similarity_matrix = cosine_similarity(sentence_embeddings)
+    
+    # Convert cosine similarity to distance matrix (1 - similarity)
+    distance_matrix = 1 - similarity_matrix
+    
+    # Ensure no negative values in the distance matrix (clip them to 0)
+    distance_matrix = np.maximum(distance_matrix, 0)
+    
+    # Apply DBSCAN clustering to identify semantically similar sentences
+    clustering_model = DBSCAN(eps=eps, min_samples=min_samples, metric="precomputed")
+    clusters = clustering_model.fit_predict(distance_matrix)
+    
+    # Group sentences into chunks based on clustering results
+    chunks = []
+    for cluster_id in np.unique(clusters):
+        if cluster_id == -1:  # -1 is the label for noise in DBSCAN
+            continue
+        chunk_sentences = [sentences[i] for i in range(len(sentences)) if clusters[i] == cluster_id]
+        
+        # Ensure the chunk does not exceed the max number of sentences
+        while len(chunk_sentences) > max_sentences_per_chunk:
+            # Split the chunk into smaller parts if it's too large
+            chunk = " ".join(chunk_sentences[:max_sentences_per_chunk])
+            chunks.append(chunk)
+            chunk_sentences = chunk_sentences[max_sentences_per_chunk:]
+        
+        # Add the remaining sentences as one chunk
+        if chunk_sentences:
+            chunks.append(" ".join(chunk_sentences))
+    
+    return chunks
+
+# Function to add PDF content to ChromaDB
+def add_pdf_to_chromadb(pdf_file_path, collection, theme):
+    global IDX
+    text = extract_text_from_pdf(pdf_file_path)
+    chunks = semantic_chunking(text)
+    
+    for chunk in chunks:
+        unique_id = str(IDX)
+        embedding = generate_embeddings(chunk)[0]
+        IDX += 1
+        
+        # Store the text chunk with metadata in ChromaDB
+        collection.add(
+            ids=[unique_id],
+            metadatas=[{
+                'theme': theme,
+                'text_chunk': chunk
+            }],
+            embeddings=[embedding]
+        )
+        
+        print(f"Added chunk to ChromaDB with ID '{unique_id}'.")
+
+# Function to retrieve relevant context from ChromaDB based on a query
+def retrieve_context_from_chromadb(query, collection, n_results=3):
+    query_embedding = generate_embeddings(query)[0]
+    
+    # Search for the closest matching embeddings in ChromaDB
+    results = collection.query(query_embeddings=[query_embedding], n_results=n_results)
+    
+    # Print debug info for the results
+    print(f"ChromaDB query results: {results}")  # Debug print
+    
+    # Retrieve the list of IDs from the query results
+    retrieved_ids = results['ids'][0]
+    
+    # Create a list to store the relevant text chunks
+    relevant_context = []
+    
+    for idx in range(len(retrieved_ids)):
+        metadata = results['metadatas'][0][idx]
+        text_chunk = metadata['text_chunk']
+        
+        # Add the relevant chunk and metadata to the list
+        relevant_context.append({
+            'id': retrieved_ids[idx],
+            'theme': metadata['theme'],
+            'text_chunk': text_chunk
+        })
+    
+    # If no relevant context found, return a default message
+    if not relevant_context:
+        return "No relevant context found."
+    
+    return relevant_context
+
+# # Example usage
+# # Assuming you have a ChromaDB collection and a SQLite database connection set up
+# collection = chromadb.Client().get_or_create_collection('pdf_collection4')
+
+# # Add PDF to ChromaDB
+# add_pdf_to_chromadb('datasets/PDF_ML.pdf', collection, theme='ML_EN')
+
+# # Retrieve context based on a query
+# retrieved_context = retrieve_context_from_chromadb('Clustering', collection)
+# print(retrieved_context)
+
 # Change the status of question with ID 3 to 'reviewed'
 # Example usage
 # client = chromadb.HttpClient(host='localhost', port=8000)

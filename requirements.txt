@@ -4,3 +4,4 @@ google-generativeai
 chromadb
 sentence-transformers
 groq
+PyMuPDF

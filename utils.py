@@ -1,5 +1,3 @@
-# utils.py
-from rag_manager import RAGManager
 import aiohttp
 from dotenv import load_dotenv
 import os
@@ -45,10 +43,6 @@ def llama_llm_call(prompt):
     completion = client.chat.completions.create(
         model="llama-3.1-70b-versatile",
         messages=[
-            {
-                "role": "system",
-                "content": "You are porfessional tech interviewer in IT industry."
-            },
             {
                 "role": "user",
                 "content": prompt,
