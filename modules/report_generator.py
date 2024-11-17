@@ -21,7 +21,7 @@ class ReportGenerator:
     def __init__(self, rag_manager):
         self.rag_manager = rag_manager
 
-    async def generate_report(self, answers, questions, max_retries=3):
+    async def generate_report(self, answers, questions, max_retries=5):
         # Compare answers, calculate score, and generate report
         schema = json.dumps(Report.model_json_schema(), indent=2)
         prompt = (

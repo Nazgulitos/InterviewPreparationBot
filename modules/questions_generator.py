@@ -41,7 +41,7 @@ async def create_questions_by_theme(theme, collection, n_questions):
         print("No context found. Please ensure the collection has relevant data.")
         return []
 
-    max_retries = 3
+    max_retries = 5
     for attempt in range(max_retries):
         print(f"Attempt {attempt + 1} to generate questions")
         # Generate questions from the context
