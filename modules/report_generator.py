@@ -26,15 +26,11 @@ class ReportGenerator:
         schema = json.dumps(Report.model_json_schema(), indent=2)
         prompt = (
             f"""Based on the user's answers: {answers}, generate a report using the following questions and proper answers: {questions}.
-            
-            Format the report as JSON that adheres to the following schema:
-            {schema}
-            Please don't judge harshlythe user's answers..
+            Please evaluate the user's answers very softly..
             "score" should be '+' or '-'
             "total_score" should be number of '+' divided by number of questions.
             Example of valid JSON:
                 "questions_and_scores": [
-                    
                         "id": 1,
                         "question": "Explain the difference between Forward Selection and Backward Elimination feature selection techniques, highlighting their iterative processes and the criteria for stopping each.",
                         "score": "-",
@@ -48,6 +44,7 @@ class ReportGenerator:
                     "Review the concepts of Forward Selection and Backward Elimination.",
                     ...
                 ]
+            Don't return anything else but only JSON
             """
         )
 
@@ -73,7 +70,7 @@ class ReportGenerator:
                     return f"Error: Unable to generate a valid report after {max_retries} attempts."
                 print("[INFO] Retrying report generation...")
 
-        print(f"[DEBUG] Parsed report JSON: {report_json}")  # Debug: Print parsed JSON report
+        # print(f"[DEBUG] Parsed report JSON: {report_json}")  # Debug: Print parsed JSON report
 
         # Format the report as a user-friendly string
         formatted_report = "Report:\n\n"
@@ -85,7 +82,7 @@ class ReportGenerator:
                 formatted_report += f"   Proper Answer: {item.proper_answer}\n"
             else:
                 # Call change_status when score is +
-                print(f"[DEBUG] Changing status for question {idx} to 'Completed'")  # Debug: Status change
+                # print(f"[DEBUG] Changing status for question {idx} to 'Completed'")  # Debug: Status change
                 await self.change_status(item.id, "Completed")
             formatted_report += "\n"
 
@@ -93,8 +90,9 @@ class ReportGenerator:
         formatted_report += "Recommendations to repeat:\n"
         formatted_report += "\n".join(report_json.recommendations_to_repeat or ["None"])  # Add default 'None' if empty
 
-        print(f"[DEBUG] Final formatted report:\n{formatted_report}")  # Debug: Print final report
+        # print(f"[DEBUG] Final formatted report:\n{formatted_report}")  # Debug: Print final report
         return formatted_report
+        # return report_json
 
     async def change_status(self, id, status):
         print(f"[DEBUG] change_status called with id: {id}, status: {status}")  # Debug: Print change_status call details

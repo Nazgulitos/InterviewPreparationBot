@@ -15,7 +15,7 @@ TOKEN = os.getenv('TELEGRAM_BOT_TOKEN')
 
 # Database connection
 client = chromadb.HttpClient(host='localhost', port=8000)
-chromadb_connection = client.get_or_create_collection(name="chromadb_final_2024")
+chromadb_connection = client.get_or_create_collection(name="chromadb_final_2024_demo")
 
 # SQLite database connection and table creation
 def create_sqlite_db(path):
@@ -36,7 +36,7 @@ db_path = 'sglite_demo.db'
 sqlite_connection = create_sqlite_db(db_path)
 
 # Add PDF to ChromaDB
-add_pdf_to_chromadb('datasets/PDF_ML.pdf', chromadb_connection, theme='ML_EN')
+# add_pdf_to_chromadb('datasets/PDF_ML.pdf', chromadb_connection, theme='ML_EN')
 # ## IOS_RU
 # theme_name = "IOS_RU"
 # csv_file_path = 'datasets/ios_interview_questions_ru.csv'

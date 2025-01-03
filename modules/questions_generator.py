@@ -20,6 +20,7 @@ def generate_question_prompt(context_chunk, n_questions):
         Generate strongly in JSON format {n_questions} questions in this format:
         "question": "<Your question here>",
         "answer": "<Suggested answer here>"
+        don't return anything else but only JSON
         """
     )
     return prompt
@@ -47,19 +48,20 @@ async def create_questions_by_theme(theme, collection, n_questions):
         # Generate questions from the context
         prompt = generate_question_prompt(context_chunks, n_questions)
         questions_response = await generate_content(prompt)
-        questions_response = questions_response.strip().lstrip("```json").rstrip("```")
+        questions_response = questions_response.lstrip("```json").rstrip("```")
+        print(f"Raw response: {questions_response}")
+        formatted_json = json.dumps(questions_response, indent=2)
+        print(f"Formatted JSON: {formatted_json}")
 
         try:
-            # Parse the response assuming it's in JSON format
             question_data = json.loads(questions_response.strip())
+
             if isinstance(question_data, list):
-                # Add questions to the cache
                 generated_questions_cache[theme].extend(question_data)
-                # Trim cache to avoid excessive memory usage
-                if len(generated_questions_cache[theme]) > 100:  # Limit cache size per theme
+                if len(generated_questions_cache[theme]) > 100:
                     generated_questions_cache[theme] = generated_questions_cache[theme][-100:]
 
-                return question_data  # Return newly generated questions
+                return question_data
             else:
                 print(f"Response is not in the expected format: {questions_response}")
         except json.JSONDecodeError:

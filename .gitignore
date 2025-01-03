@@ -136,7 +136,7 @@ config.py
 *.tflite
 
 # Miscellaneous files
-*.pdf
+datasets/PDF_ML.pdf
 *.docx
 *.pptx
 *.key
